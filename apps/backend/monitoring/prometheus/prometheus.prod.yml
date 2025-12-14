@@ -16,21 +16,24 @@ scrape_configs:
     scrape_interval: 5s
     static_configs:
       - targets:
+          - '10.0.101.26:5001'
           - '10.0.101.243:5001'
           - '10.0.101.54:5001'
           - '10.0.101.152:5001'
           - '10.0.101.149:5001'
           - '10.0.101.230:5001'
-          - '10.0.101.60:5001'
-          - '10.0.101.109:5001'
-          - '10.0.101.109:5001'
+          - '10.0.101.90:5001'
+          - '10.0.101.142:5001'
         labels:
           application: 'ktb-chat-backend'
           environment: 'production'
 
   - job_name: 'mongodb'
     static_configs:
-      - targets: ['10.0.101.58:9216']
+      - targets:
+          - '10.0.101.58:9216'
+          - '10.0.101.125:9216'
+          - '10.0.101.202:9216'
         labels:
           environment: 'production'
 

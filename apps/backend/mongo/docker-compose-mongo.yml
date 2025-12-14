@@ -1,0 +1,25 @@
+services:
+  mongo:
+    image: mongo:8
+    container_name: mongo
+    restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  mongodb-exporter:
+    image: percona/mongodb_exporter:0.47.1
+    container_name: mongodb-exporter
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    ports:
+      - "9216:9216"
+    command:
+      - "--mongodb.uri=mongodb://127.0.0.1:27017/?directConnection=true"
+      - "--collect-all"
+
+volumes:
+  mongo_data:
