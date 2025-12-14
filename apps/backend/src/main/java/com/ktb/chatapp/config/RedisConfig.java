@@ -58,8 +58,18 @@ public class RedisConfig {
                 .setSubscriptionMode(org.redisson.config.SubscriptionMode.SLAVE); // Subscribe from slaves
 
         // Configure JSON codec with JavaTimeModule for LocalDateTime support
+        // Disable default typing completely to avoid @class type id requirement
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
+
+        // Completely disable polymorphic type handling
+        objectMapper.deactivateDefaultTyping();
+        objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false);
+        objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+        // Set type resolver to null to prevent any type information processing
+        objectMapper.setDefaultTyping(null);
+
         config.setCodec(new JsonJacksonCodec(objectMapper));
 
         log.info("Redis Cluster configured with {} nodes", nodes.length);

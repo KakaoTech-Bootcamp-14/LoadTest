@@ -93,19 +93,38 @@ public class RedisChatDataStore implements ChatDataStore {
 
     @Override
     public int size() {
-        // Note: Size operation is not efficient with RBucket-based storage
-        // This is a limitation of the bucket-based approach
-        // Consider using RMap if you need efficient size operations
-        log.warn("size() operation is not supported with RBucket-based storage");
-        return 0;
+        // Note: Size operation uses SCAN which may not be perfectly accurate in distributed systems
+        // This is acceptable for metrics/monitoring purposes
+        try {
+            // Use SCAN to count keys with our prefix (more efficient than KEYS)
+            Iterable<String> keys = redissonClient.getKeys().getKeysByPattern(KEY_PREFIX + "*");
+            int count = 0;
+            for (String key : keys) {
+                count++;
+            }
+            return count;
+        } catch (Exception e) {
+            log.error("Error getting size from Redis", e);
+            return 0;
+        }
     }
 
     /**
      * Clear all data in the store.
-     * Note: This operation is not efficient with RBucket-based storage.
+     * Uses SCAN to find and delete all keys with the prefix.
      */
     public void clear() {
-        log.warn("clear() operation is not efficiently supported with RBucket-based storage");
-        log.warn("Consider using Redis KEYS or SCAN command if bulk deletion is needed");
+        try {
+            Iterable<String> keys = redissonClient.getKeys().getKeysByPattern(KEY_PREFIX + "*");
+            int count = 0;
+            for (String key : keys) {
+                redissonClient.getBucket(key).delete();
+                count++;
+            }
+            log.info("Cleared {} entries from Redis chat data store", count);
+        } catch (Exception e) {
+            log.error("Error clearing Redis data store", e);
+            throw new RuntimeException("Failed to clear Redis data store", e);
+        }
     }
 }
