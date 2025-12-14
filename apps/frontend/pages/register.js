@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { ErrorCircleIcon, CheckCircleIcon } from '@vapor-ui/icons';
 import {
@@ -27,6 +27,14 @@ const Register = () => {
   const router = useRouter();
   const { register: registerContext } = useAuth();
 
+  // 회원가입 성공 시 자동 리다이렉트
+  useEffect(() => {
+    if (success) {
+      // React 렌더링 완료 후 리다이렉트
+      router.push('/');
+    }
+  }, [success, router]);
+
   const validateForm = () => {
     // 비밀번호 일치 확인만 추가 검증 (나머지는 HTML5 폼 검증)
     if (formData.password !== formData.confirmPassword) {
@@ -51,13 +59,9 @@ const Register = () => {
     try {
       const { name, email, password } = formData;
       await registerContext({ name, email, password });
-      
+
       setSuccess(true);
       setLoading(false);
-
-      setTimeout(() => {
-        router.push('/');
-      }, 1000);
     } catch (err) {
       setError(err.message || '회원가입 처리 중 오류가 발생했습니다.');
       setLoading(false);

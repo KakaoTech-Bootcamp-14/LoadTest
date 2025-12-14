@@ -8,7 +8,7 @@ const {
   updateProfileAction,
 } = require('../actions/profile.actions');
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const BASE_URL = 'https://chat.goorm-ktb-014.goorm.team';
 const PROFILE_IMAGE_PATH = path.resolve(__dirname, '../fixtures/images/profile.jpg');
 
 test.describe.serial('프로필 E2E 테스트', () => {

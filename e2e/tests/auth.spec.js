@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { loginAction, registerAction, logoutAction } = require('../actions/auth.actions');
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const BASE_URL = 'https://chat.goorm-ktb-014.goorm.team';
 
 test.describe.serial('인증 E2E 테스트', () => {
   let testUser;

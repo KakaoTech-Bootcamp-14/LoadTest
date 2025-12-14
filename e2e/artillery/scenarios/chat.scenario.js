@@ -9,7 +9,7 @@ const { expect } = require('@playwright/test');
 const path = require('path');
 const { randomUUID } = require('crypto');
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const BASE_URL = 'https://chat.goorm-ktb-014.goorm.team';
 const MASS_MESSAGE_COUNT = process.env.MASS_MESSAGE_COUNT || 10;
 
 // Action 간 timeout 설정 (환경변수로 조절 가능)

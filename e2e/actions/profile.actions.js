@@ -1,4 +1,4 @@
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const BASE_URL = 'https://chat.goorm-ktb-014.goorm.team';
 
 /**
  * 프로필 페이지로 이동 액션

@@ -12,7 +12,7 @@ const {
   addEmojiReactionAction,
 } = require('../actions/chat.actions');
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const BASE_URL = 'https://chat.goorm-ktb-014.goorm.team';
 const USER_COUNT = 5;
 
 // 유틸리티 함수
