@@ -1,0 +1,26 @@
+# 개별 레디스 클러스터 구축을 위한 내용
+
+# 서비스
+services:
+  redis:
+    image: redis:7.2
+    container_name: redis
+    restart: unless-stopped
+    network_mode: "host"
+    command: ["redis-server", "/etc/redis/redis.conf"]
+    volumes:
+      - ./redis/conf/redis.conf:/etc/redis/redis.conf:ro
+      - redis_data:/data
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.80.0
+    container_name: redis-exporter
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      - REDIS_ADDR=redis://127.0.0.1:6379
+    depends_on:
+      - redis
+
+volumes:
+  redis_data:
