@@ -1,36 +1,56 @@
-# Production Environment - Node Exporters
-# 프로덕션 환경의 Node Exporter 타겟 목록
-# 서버 추가 시 이 파일만 수정하면 자동으로 반영됩니다 (Prometheus 재시작 불필요)
-
 - targets:
-    - 'IP:PORT'
+    - '10.0.101.243:9100'
+    - '10.0.101.54:9100'
+    - '10.0.101.152:9100'
+    - '10.0.101.149:9100'
+    - '10.0.101.230:9100'
+    - '10.0.101.60:9100'
+    - '10.0.101.109:9100'
   labels:
+    name: 'backend-api-1'
     environment: 'production'
     region: 'ap-northeast-2'
     cluster: 'backend'
     service: 'api'
 
 - targets:
-    - 'IP:PORT'
+    - '10.0.101.126:9100'
+    - '10.0.101.182:9100'
+    - '10.0.101.202:9100'
   labels:
+    name: 'frontend-next-1'
     environment: 'production'
     region: 'ap-northeast-2'
     cluster: 'frontend'
     service: 'next'
 
 - targets:
-    - 'IP:PORT'
+    - '10.0.101.58:9100'
   labels:
+    name: 'db-mongodb-1'
     environment: 'production'
     region: 'ap-northeast-2'
     cluster: 'database'
     service: 'mongodb'
 
-
-# Monitoring Server
 - targets:
-    - 'IP:PORT'
+    - '10.0.101.34:9100'
+    - '10.0.101.159:9100'
+    - '10.0.101.154:9100'
+    - '10.0.101.245:9100'
+    - '10.0.101.212:9100'
+    - '10.0.101.239:9100'
   labels:
+    name: 'db-redis-1'
+    environment: 'production'
+    region: 'ap-northeast-2'
+    cluster: 'database'
+    service: 'redis'
+
+- targets:
+    - '10.0.101.83:9100'
+  labels:
+    name: 'monitoring-server'
     environment: 'production'
     region: 'ap-northeast-2'
     cluster: 'monitoring'
