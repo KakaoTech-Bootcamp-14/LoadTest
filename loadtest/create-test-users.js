@@ -15,7 +15,7 @@ const argv = yargs(hideBin(process.argv))
   .option('api-url', {
     description: 'Backend REST API URL',
     type: 'string',
-    default: 'http://localhost:5001'
+    default: 'https://api.goorm-ktb-014.goorm.team'
   })
   .option('start-index', {
     alias: 's',
