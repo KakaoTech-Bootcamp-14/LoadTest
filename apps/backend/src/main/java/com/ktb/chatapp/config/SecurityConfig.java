@@ -30,7 +30,7 @@ public class SecurityConfig {
     private final CustomBearerTokenResolver bearerTokenResolver;
     private final SessionAwareJwtAuthenticationConverter jwtAuthenticationConverter;
 
-    private static final List<String> CORS_ALLOWED_ORIGINS = List.of("*");
+    private static final List<String> CORS_ALLOWED_ORIGINS = List.of("https://chat.goorm-ktb-014.goorm.team");
 
     private static final List<String> CORS_ALLOWED_HEADERS = List.of(
             "Content-Type",
