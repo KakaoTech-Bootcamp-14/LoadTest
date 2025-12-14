@@ -15,9 +15,11 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
   // 프로필 이미지 URL 생성
   const getProfileImageUrl = (imagePath) => {
     if (!imagePath) return null;
-    return imagePath.startsWith('http') ? 
-      imagePath : 
-      `${process.env.NEXT_PUBLIC_API_URL}${imagePath}`;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
+    if (imagePath.startsWith('http')) return imagePath;
+    if (imagePath.startsWith('/')) return `${apiBase}${imagePath}`;
+    const encoded = encodeURIComponent(imagePath);
+    return `${apiBase}/api/files/view/${encoded}`;
   };
 
   // 컴포넌트 마운트 시 이미지 설정

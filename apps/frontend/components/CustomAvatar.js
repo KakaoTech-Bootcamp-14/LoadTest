@@ -48,7 +48,11 @@ const CustomAvatar = forwardRef(({
       return imagePath;
     }
     // API URL과 결합 필요한 경우
-    return `${process.env.NEXT_PUBLIC_API_URL}${imagePath}`;
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    if (imagePath.startsWith('/')) {
+      return `${baseUrl}${imagePath}`;
+    }
+    return `${baseUrl}/api/files/view/${encodeURIComponent(imagePath)}`;
   }, [src]);
 
   // persistent 모드: 프로필 이미지 URL 처리

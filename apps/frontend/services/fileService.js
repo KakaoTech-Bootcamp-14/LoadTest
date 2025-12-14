@@ -149,42 +149,33 @@ class FileService {
   }
   async downloadFile(filename, originalname, token, sessionId) {
     try {
-      // 파일 존재 여부 먼저 확인
       const downloadUrl = this.getFileUrl(filename, false);
-      // axios 인터셉터가 자동으로 인증 헤더를 추가합니다
+
+      // 파일 존재 여부 먼저 확인 (리다이렉트 포함 허용)
       const checkResponse = await axiosInstance.head(downloadUrl, {
         validateStatus: status => status < 500,
         withCredentials: true
       });
 
-      if (checkResponse.status === 404) {
-        return {
-          success: false,
-          message: '파일을 찾을 수 없습니다.'
-        };
-      }
-
-      if (checkResponse.status === 403) {
-        return {
-          success: false,
-          message: '파일에 접근할 권한이 없습니다.'
-        };
-      }
-
-      if (checkResponse.status !== 200) {
-        return {
-          success: false,
-          message: '파일 다운로드 준비 중 오류가 발생했습니다.'
-        };
+      if (checkResponse.status >= 400) {
+        if (checkResponse.status === 404) {
+          return { success: false, message: '파일을 찾을 수 없습니다.' };
+        }
+        if (checkResponse.status === 403) {
+          return { success: false, message: '파일에 접근할 권한이 없습니다.' };
+        }
+        return { success: false, message: '파일 다운로드 준비 중 오류가 발생했습니다.' };
       }
 
       // axios 인터셉터가 자동으로 인증 헤더를 추가합니다
-      const response = await axiosInstance({
+      const targetUrl = checkResponse.headers?.location || downloadUrl;
+      const client = targetUrl.startsWith('http') ? axios : axiosInstance;
+      const response = await client({
         method: 'GET',
-        url: downloadUrl,
+        url: targetUrl,
         responseType: 'blob',
         timeout: 30000,
-        withCredentials: true
+        withCredentials: !targetUrl.startsWith('http')
       });
 
       const contentType = response.headers['content-type'];
@@ -235,24 +226,28 @@ class FileService {
 
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
     const endpoint = forPreview ? 'view' : 'download';
-    return `${baseUrl}/api/files/${endpoint}/${filename}`;
+    const encodedName = encodeURIComponent(filename);
+    return `${baseUrl}/api/files/${endpoint}/${encodedName}`;
   }
 
   getPreviewUrl(file, token, sessionId, withAuth = true) {
     if (!file?.filename) return '';
 
-    const baseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/files/view/${file.filename}`;
+    const baseUrl = this.getFileUrl(file.filename, true);
 
     if (!withAuth) return baseUrl;
 
     if (!token || !sessionId) return baseUrl;
 
-    // URL 객체 생성 전 프로토콜 확인
-    const url = new URL(baseUrl);
-    url.searchParams.append('token', encodeURIComponent(token));
-    url.searchParams.append('sessionId', encodeURIComponent(sessionId));
-
-    return url.toString();
+    try {
+      const url = new URL(baseUrl, window.location.origin);
+      url.searchParams.append('token', encodeURIComponent(token));
+      url.searchParams.append('sessionId', encodeURIComponent(sessionId));
+      return url.toString();
+    } catch (e) {
+      console.error('Failed to construct preview URL', e);
+      return baseUrl;
+    }
   }
 
   getFileType(filename) {

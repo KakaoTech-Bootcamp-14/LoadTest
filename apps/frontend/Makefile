@@ -7,7 +7,7 @@ SSH_USER ?= ubuntu
 # 배포 대상 서버 설정
 # 형식: 스페이스로 구분된 IP 주소 목록
 # 사용법: make deploy-prod DEPLOY_SERVERS="ip1 ip2 ip3"
-DEPLOY_SERVERS ?= 3.36.118.176
+DEPLOY_SERVERS ?= 3.36.118.176 3.38.209.209
 DEV_SERVER ?=
 
 # 실제 배포할 서버 목록 (SERVERS 변수가 제공되면 우선 사용)

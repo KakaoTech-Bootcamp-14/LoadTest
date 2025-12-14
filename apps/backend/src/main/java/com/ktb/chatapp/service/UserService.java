@@ -11,12 +11,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
@@ -28,9 +25,6 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final FileService fileService;
-
-    @Value("${app.upload.dir:uploads}")
-    private String uploadDir;
 
     @Value("${app.profile.image.max-size:5242880}") // 5MB
     private long maxProfileImageSize;
@@ -81,11 +75,13 @@ public class UserService {
 
         // 기존 프로필 이미지 삭제
         if (user.getProfileImage() != null && !user.getProfileImage().isEmpty()) {
-            deleteOldProfileImage(user.getProfileImage());
+            deleteOldProfileImage(user.getProfileImage(), user.getId());
         }
 
         // 새 파일 저장 (보안 검증 포함)
-        String profileImageUrl = fileService.storeFile(file, "profiles");
+        var uploadResult = fileService.uploadFile(file, user.getId(), "profiles");
+        String safeFilename = uploadResult.getFile().getFilename();
+        String profileImageUrl = "/api/files/view/" + safeFilename;
 
         // 사용자 프로필 이미지 URL 업데이트
         user.setProfileImage(profileImageUrl);
@@ -146,19 +142,22 @@ public class UserService {
     /**
      * 기존 프로필 이미지 삭제
      */
-    private void deleteOldProfileImage(String profileImageUrl) {
-        try {
-            if (profileImageUrl != null && profileImageUrl.startsWith("/uploads/")) {
-                // URL에서 파일명 추출
-                String filename = profileImageUrl.substring("/uploads/".length());
-                Path filePath = Paths.get(uploadDir, filename);
+    private void deleteOldProfileImage(String profileImageUrl, String userId) {
+        if (!StringUtils.hasText(profileImageUrl)) {
+            return;
+        }
 
-                if (Files.exists(filePath)) {
-                    Files.delete(filePath);
-                    log.info("기존 프로필 이미지 삭제 완료: {}", filename);
-                }
+        String filename = extractFilename(profileImageUrl);
+        if (!StringUtils.hasText(filename)) {
+            return;
+        }
+
+        try {
+            boolean deleted = fileService.deleteFileByFilename(filename, userId);
+            if (deleted) {
+                log.info("기존 프로필 이미지 삭제 완료: {}", filename);
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             log.warn("기존 프로필 이미지 삭제 실패: {}", e.getMessage());
         }
     }
@@ -172,7 +171,7 @@ public class UserService {
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
 
         if (user.getProfileImage() != null && !user.getProfileImage().isEmpty()) {
-            deleteOldProfileImage(user.getProfileImage());
+            deleteOldProfileImage(user.getProfileImage(), user.getId());
             user.setProfileImage("");
             user.setUpdatedAt(LocalDateTime.now());
             userRepository.save(user);
@@ -189,10 +188,22 @@ public class UserService {
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
 
         if (user.getProfileImage() != null && !user.getProfileImage().isEmpty()) {
-            deleteOldProfileImage(user.getProfileImage());
+            deleteOldProfileImage(user.getProfileImage(), user.getId());
         }
 
         userRepository.delete(user);
         log.info("회원 탈퇴 완료 - User ID: {}", user.getId());
+    }
+
+    private String extractFilename(String profileImageUrl) {
+        if (!StringUtils.hasText(profileImageUrl)) {
+            return "";
+        }
+
+        String trimmed = profileImageUrl.trim();
+        if (trimmed.contains("/")) {
+            return trimmed.substring(trimmed.lastIndexOf('/') + 1);
+        }
+        return trimmed;
     }
 }

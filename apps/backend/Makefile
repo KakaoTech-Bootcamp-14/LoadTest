@@ -8,7 +8,7 @@ BACKEND_SCALE ?= 3
 
 # EC2 서버 목록 (IP 주소 또는 별칭)
 # 사용법: make deploy-jar SERVERS="server1 server2" 또는 make deploy-jar (전체)
-DEPLOY_SERVERS ?= 13.125.72.70 52.79.78.194 54.180.242.111 3.36.49.34 43.202.62.120 43.201.72.226 43.200.252.168
+DEPLOY_SERVERS ?=13.125.72.70 52.79.78.194 54.180.242.111 3.36.49.34 43.202.62.120 43.202.68.141 3.38.105.80
 
 DEPLOY_PATH ?= /home/ubuntu/ktb-chat-backend
 JVM_OPTS ?= -Xmx1024m
