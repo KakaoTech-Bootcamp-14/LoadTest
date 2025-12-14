@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -305,6 +306,56 @@ public class FileController {
             errorResponse.put("message", "파일 삭제 중 오류가 발생했습니다.");
             errorResponse.put("error", errorMessage);
             return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
+
+    @GetMapping("/raw/{filename:.+}")
+    public ResponseEntity<?> serveLocalFile(
+            @PathVariable String filename,
+            @RequestParam(name = "disposition", defaultValue = "inline") String disposition,
+            @RequestParam(name = "filename", required = false) String encodedName,
+            Principal principal) {
+        try {
+            User user = userRepository.findByEmail(principal.getName())
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + principal.getName()));
+
+            Resource resource = fileService.loadFileAsResource(filename, user.getId());
+            File fileEntity = fileRepository.findByFilename(filename)
+                    .orElseThrow(() -> new RuntimeException("파일을 찾을 수 없습니다."));
+
+            String original = encodedName != null ? encodedName : fileEntity.getOriginalname();
+            String contentDisposition = String.format("%s; filename*=UTF-8''%s", disposition, original);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                    .header(HttpHeaders.CONTENT_TYPE, fileEntity.getMimetype())
+                    .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(fileEntity.getSize()))
+                    .body(resource);
+        } catch (Exception e) {
+            log.error("로컬 파일 제공 중 에러: {}", filename, e);
+            return handleFileError(e);
+        }
+    }
+
+    @RequestMapping(value = "/raw/{filename:.+}", method = RequestMethod.HEAD)
+    public ResponseEntity<?> headLocalFile(
+            @PathVariable String filename,
+            Principal principal) {
+        try {
+            User user = userRepository.findByEmail(principal.getName())
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + principal.getName()));
+
+            Resource resource = fileService.loadFileAsResource(filename, user.getId());
+            File fileEntity = fileRepository.findByFilename(filename)
+                    .orElseThrow(() -> new RuntimeException("파일을 찾을 수 없습니다."));
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_TYPE, fileEntity.getMimetype())
+                    .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(fileEntity.getSize()))
+                    .build();
+        } catch (Exception e) {
+            log.error("로컬 파일 HEAD 중 에러: {}", filename, e);
+            return handleFileError(e);
         }
     }
 }

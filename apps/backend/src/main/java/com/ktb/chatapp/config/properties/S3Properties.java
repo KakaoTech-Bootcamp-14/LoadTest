@@ -49,4 +49,9 @@ public class S3Properties {
      * Presigned URL validity.
      */
     private Duration presignDuration = Duration.ofMinutes(15);
+
+    /**
+     * Local fallback directory when S3 config is missing (dev/test).
+     */
+    private String localDir = "./uploads";
 }

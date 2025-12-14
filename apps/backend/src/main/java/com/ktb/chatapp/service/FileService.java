@@ -1,6 +1,7 @@
 package com.ktb.chatapp.service;
 
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.core.io.Resource;
 
 public interface FileService {
 
@@ -9,6 +10,8 @@ public interface FileService {
     FileUploadResult uploadFile(MultipartFile file, String uploaderId, String subDirectory);
 
     PresignedUrlResult generatePresignedGetUrl(String filename, String requesterId, boolean inline);
+
+    Resource loadFileAsResource(String filename, String requesterId);
 
     boolean deleteFile(String fileId, String requesterId);
 
