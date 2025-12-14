@@ -167,13 +167,25 @@ class AuthService {
    */
   async register(userData) {
     try {
-      const response = await api.post('/api/auth/register', userData);
+      // fetch + keepalive로 페이지 이동 중에도 요청이 취소되지 않도록 처리
+      const response = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(userData),
+        credentials: 'include',
+        keepalive: true
+      });
 
-      if (response.data?.success) {
-        return response.data;
+      const data = await response.json();
+
+      if (response.ok && data?.success) {
+        return data;
       }
 
-      throw new Error(response.data?.message || '회원가입에 실패했습니다.');
+      throw new Error(data?.message || '회원가입에 실패했습니다.');
     } catch (error) {
       throw this._handleError(error);
     }
