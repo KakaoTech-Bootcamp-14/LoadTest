@@ -119,13 +119,10 @@ public class RoomLeaveHandler {
         if (roomOpt.isEmpty()) {
             return;
         }
-        
-        var participantList = roomOpt.get()
-                .getParticipantIds()
+
+        // N+1 해결: batch lookup으로 모든 참가자를 한 번에 조회
+        var participantList = userRepository.findByIdIn(roomOpt.get().getParticipantIds())
                 .stream()
-                .map(userRepository::findById)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
                 .map(UserResponse::from)
                 .toList();
         

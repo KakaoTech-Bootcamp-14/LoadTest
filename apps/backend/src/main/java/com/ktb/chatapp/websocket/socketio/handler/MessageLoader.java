@@ -11,6 +11,8 @@ import com.ktb.chatapp.service.MessageReadStatusService;
 import jakarta.annotation.Nullable;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,11 +68,23 @@ public class MessageLoader {
         
         var messageIds = sortedMessages.stream().map(Message::getId).toList();
         messageReadStatusService.updateReadStatus(messageIds, userId);
-        
-        // 메시지 응답 생성
+
+        // N+1 해결: unique sender ID 추출 후 batch lookup
+        List<String> uniqueSenderIds = sortedMessages.stream()
+                .map(Message::getSenderId)
+                .filter(senderId -> senderId != null)
+                .distinct()
+                .toList();
+
+        // sender ID로 user를 한 번에 조회하고 Map으로 캐싱
+        Map<String, User> userMap = userRepository.findByIdIn(uniqueSenderIds)
+                .stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        // 메시지 응답 생성 - Map에서 user lookup (O(1))
         List<MessageResponse> messageResponses = sortedMessages.stream()
                 .map(message -> {
-                    var user = findUserById(message.getSenderId());
+                    User user = message.getSenderId() != null ? userMap.get(message.getSenderId()) : null;
                     return messageResponseMapper.mapToMessageResponse(message, user);
                 })
                 .collect(Collectors.toList());

@@ -104,12 +104,9 @@ public class RoomJoinHandler {
                 return;
             }
 
-            // 참가자 정보 조회
-            List<UserResponse> participants = roomOpt.get().getParticipantIds()
+            // N+1 해결: batch lookup으로 모든 참가자를 한 번에 조회
+            List<UserResponse> participants = userRepository.findByIdIn(roomOpt.get().getParticipantIds())
                     .stream()
-                    .map(userRepository::findById)
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
                     .map(UserResponse::from)
                     .toList();
             
