@@ -28,7 +28,6 @@ async function registerAction(page, userData) {
   await page.getByTestId('register-password-confirm-input').fill(userData.passwordConfirm);
   await page.getByTestId('register-name-input').fill(userData.name);
   await page.getByTestId('register-submit-button').click();
-  await page.waitForTimeout(1000);
 }
 
 /**
