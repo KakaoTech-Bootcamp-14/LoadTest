@@ -1,5 +1,6 @@
 package com.ktb.chatapp.service;
 
+import com.ktb.chatapp.dto.FileUploadInitRequest;
 import com.ktb.chatapp.dto.ProfileImageResponse;
 import com.ktb.chatapp.dto.UpdateProfileRequest;
 import com.ktb.chatapp.dto.UserResponse;
@@ -78,35 +79,25 @@ public class UserService {
             deleteOldProfileImage(user.getProfileImage(), user.getId());
         }
 
-        // 새 파일 저장 (보안 검증 포함)
         var uploadResult = fileService.uploadFile(file, user.getId(), "profiles");
-        String safeFilename = uploadResult.getFile().getFilename();
+        return applyProfileImageUpdate(user, uploadResult);
+    }
 
-        // S3 public URL 생성
-        String profileImageUrl;
-        try {
-            if (fileService instanceof S3FileService) {
-                profileImageUrl = ((S3FileService) fileService).getS3PublicUrl(safeFilename);
-            } else {
-                profileImageUrl = "/api/files/view/" + safeFilename;
-            }
-        } catch (Exception e) {
-            log.warn("S3 URL 생성 실패, fallback URL 사용: {}", e.getMessage());
-            profileImageUrl = "/api/files/view/" + safeFilename;
+    /**
+     * 프로필 이미지 업로드 (presigned URL 기반)
+     */
+    public ProfileImageResponse uploadProfileImage(String email, FileUploadInitRequest request) {
+        User user = userRepository.findByEmail(email.toLowerCase())
+                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+
+        validateProfileImageMetadata(request);
+
+        if (user.getProfileImage() != null && !user.getProfileImage().isEmpty()) {
+            deleteOldProfileImage(user.getProfileImage(), user.getId());
         }
 
-        // 사용자 프로필 이미지 URL 업데이트
-        user.setProfileImage(profileImageUrl);
-        user.setUpdatedAt(LocalDateTime.now());
-        userRepository.save(user);
-
-        log.info("프로필 이미지 업로드 완료 - User ID: {}, File: {}", user.getId(), profileImageUrl);
-
-        return new ProfileImageResponse(
-                true,
-                "프로필 이미지가 업데이트되었습니다.",
-                profileImageUrl
-        );
+        var uploadResult = fileService.initiateUpload(request, user.getId(), "profiles");
+        return applyProfileImageUpdate(user, uploadResult);
     }
 
     /**
@@ -149,6 +140,62 @@ public class UserService {
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
             throw new IllegalArgumentException("이미지 파일만 업로드할 수 있습니다.");
         }
+    }
+
+    /**
+     * 프로필 이미지 메타데이터 유효성 검증 (presigned URL용)
+     */
+    private void validateProfileImageMetadata(FileUploadInitRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("이미지 정보가 제공되지 않았습니다.");
+        }
+
+        if (request.getSize() == null || request.getSize() <= 0) {
+            throw new IllegalArgumentException("이미지 크기가 올바르지 않습니다.");
+        }
+
+        if (request.getSize() > maxProfileImageSize) {
+            throw new IllegalArgumentException("파일 크기는 5MB를 초과할 수 없습니다.");
+        }
+
+        if (!StringUtils.hasText(request.getMimetype()) || !request.getMimetype().startsWith("image/")) {
+            throw new IllegalArgumentException("이미지 파일만 업로드할 수 있습니다.");
+        }
+
+        if (!StringUtils.hasText(request.getFilename())) {
+            throw new IllegalArgumentException("이미지 파일만 업로드할 수 있습니다.");
+        }
+
+        String extension = FileUtil.getFileExtension(request.getFilename()).toLowerCase();
+        if (!ALLOWED_EXTENSIONS.contains(extension)) {
+            throw new IllegalArgumentException("이미지 파일만 업로드할 수 있습니다.");
+        }
+    }
+
+    private ProfileImageResponse applyProfileImageUpdate(User user, FileUploadResult uploadResult) {
+        if (uploadResult == null || uploadResult.getFile() == null) {
+            throw new RuntimeException("업로드된 파일 정보를 찾을 수 없습니다.");
+        }
+
+        String safeFilename = uploadResult.getFile().getFilename();
+        String profileImageUrl = "/api/files/view/" + safeFilename;
+
+        user.setProfileImage(profileImageUrl);
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        log.info("프로필 이미지 업로드 완료 - User ID: {}, File: {}", user.getId(), profileImageUrl);
+
+        return ProfileImageResponse.builder()
+                .success(true)
+                .message("프로필 이미지가 업데이트되었습니다.")
+                .imageUrl(profileImageUrl)
+                .uploadUrl(uploadResult.getUploadUrl())
+                .uploadHeaders(uploadResult.getUploadHeaders())
+                .requiresUpload(uploadResult.isRequiresUpload())
+                .filename(safeFilename)
+                .fileId(uploadResult.getFile().getId())
+                .build();
     }
 
     /**

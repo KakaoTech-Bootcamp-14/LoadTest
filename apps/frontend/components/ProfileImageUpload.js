@@ -1,3 +1,4 @@
+import axios from 'axios';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { CameraIcon, CloseOutlineIcon } from '@vapor-ui/icons';
 import { Button, Text, Callout, IconButton, VStack, HStack } from '@vapor-ui/core';
@@ -71,36 +72,52 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
         throw new Error('인증 정보가 없습니다.');
       }
 
-      // FormData 생성
-      const formData = new FormData();
-      formData.append('profileImage', file);
+      const uploadInitPayload = {
+        filename: file.name,
+        mimetype: file.type || 'application/octet-stream',
+        size: file.size
+      };
 
-      // 파일 업로드 요청
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/profile-image`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'x-auth-token': user?.token,
           'x-session-id': user?.sessionId
         },
-        body: formData
+        body: JSON.stringify(uploadInitPayload)
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || '이미지 업로드에 실패했습니다.');
+      const data = await response.json();
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || '이미지 업로드에 실패했습니다.');
       }
 
-      const data = await response.json();
+      if (data.requiresUpload && data.uploadUrl) {
+        const headers = {
+          ...(data.uploadHeaders || {}),
+          'Content-Type': file.type || 'application/octet-stream'
+        };
+
+        await axios.put(data.uploadUrl, file, { headers });
+      }
+
+      const nextImageUrl = data.imageUrl;
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      setPreviewUrl(getProfileImageUrl(nextImageUrl));
       
       // 로컬 스토리지의 사용자 정보 업데이트
       const updatedUser = {
         ...user,
-        profileImage: data.imageUrl
+        profileImage: nextImageUrl
       };
       localStorage.setItem('user', JSON.stringify(updatedUser));
 
       // 부모 컴포넌트에 변경 알림
-      onImageChange(data.imageUrl);
+      onImageChange(nextImageUrl);
 
       Toast.success('프로필 이미지가 변경되었습니다.');
 

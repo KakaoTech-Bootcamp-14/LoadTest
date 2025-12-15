@@ -85,6 +85,43 @@ public class FileUtil {
     }
 
     /**
+     * 파일 메타데이터 유효성 검증 (presigned 업로드용)
+     */
+    public static void validateFileMetadata(String filename, String mimetype, long size) {
+        if (filename == null || filename.trim().isEmpty()) {
+            throw new RuntimeException("파일명이 올바르지 않습니다.");
+        }
+
+        int filenameBytes = filename.getBytes(StandardCharsets.UTF_8).length;
+        if (filenameBytes > 255) {
+            throw new RuntimeException("파일명이 너무 깁니다.");
+        }
+
+        if (mimetype == null || !ALLOWED_TYPES.containsKey(mimetype)) {
+            throw new RuntimeException("지원하지 않는 파일 형식입니다.");
+        }
+
+        if (size <= 0) {
+            throw new RuntimeException("파일 크기가 올바르지 않습니다.");
+        }
+
+        String extension = getFileExtension(filename).toLowerCase();
+        List<String> allowedExtensions = ALLOWED_TYPES.get(mimetype);
+        if (allowedExtensions == null || !allowedExtensions.contains(extension)) {
+            String fileType = getFileType(mimetype);
+            throw new RuntimeException(fileType + " 확장자가 올바르지 않습니다.");
+        }
+
+        String type = mimetype.split("/")[0];
+        long limit = FILE_SIZE_LIMITS.getOrDefault(type, FILE_SIZE_LIMITS.get("application"));
+        if (size > limit) {
+            int limitInMB = (int) (limit / 1024 / 1024);
+            String fileType = getFileType(mimetype);
+            throw new RuntimeException(fileType + " 파일은 " + limitInMB + "MB를 초과할 수 없습니다.");
+        }
+    }
+
+    /**
      * 파일 타입 한글명 반환
      */
     private static String getFileType(String mimetype) {

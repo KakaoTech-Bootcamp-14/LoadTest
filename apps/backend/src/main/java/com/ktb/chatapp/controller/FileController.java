@@ -1,5 +1,6 @@
 package com.ktb.chatapp.controller;
 
+import com.ktb.chatapp.dto.FileUploadInitRequest;
 import com.ktb.chatapp.dto.StandardResponse;
 import com.ktb.chatapp.model.File;
 import com.ktb.chatapp.model.User;
@@ -8,7 +9,6 @@ import com.ktb.chatapp.repository.UserRepository;
 import com.ktb.chatapp.service.FileService;
 import com.ktb.chatapp.service.FileUploadResult;
 import com.ktb.chatapp.service.PresignedUrlResult;
-import com.ktb.chatapp.service.S3FileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.net.URI;
 import java.security.Principal;
 import java.util.HashMap;
@@ -25,15 +26,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -63,15 +67,31 @@ public class FileController {
         @ApiResponse(responseCode = "500", description = "서버 내부 오류",
             content = @Content(schema = @Schema(implementation = StandardResponse.class)))
     })
-    @PostMapping("/upload")
+    @PostMapping(
+            value = "/upload",
+            consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE})
     public ResponseEntity<?> uploadFile(
-            @Parameter(description = "업로드할 파일") @RequestParam("file") MultipartFile file,
+            @Parameter(description = "업로드할 파일") @RequestPart(value = "file", required = false) MultipartFile file,
+            @Parameter(description = "업로드할 파일 메타데이터") @RequestPart(value = "metadata", required = false) @Valid FileUploadInitRequest metadata,
+            @RequestBody(required = false) @Valid FileUploadInitRequest jsonRequest,
             Principal principal) {
         try {
             User user = userRepository.findByEmail(principal.getName())
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + principal.getName()));
 
-            FileUploadResult result = fileService.uploadFile(file, user.getId());
+            FileUploadInitRequest request = metadata != null ? metadata : jsonRequest;
+            FileUploadResult result;
+
+            if (file != null && !file.isEmpty()) {
+                result = fileService.uploadFile(file, user.getId());
+            } else if (request != null) {
+                result = fileService.initiateUpload(request, user.getId());
+            } else {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("success", false);
+                errorResponse.put("message", "업로드할 파일 정보가 없습니다.");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
 
             if (result.isSuccess()) {
                 Map<String, Object> response = new HashMap<>();
@@ -85,21 +105,11 @@ public class FileController {
                 fileData.put("mimetype", result.getFile().getMimetype());
                 fileData.put("size", result.getFile().getSize());
                 fileData.put("uploadDate", result.getFile().getUploadDate());
-
-                // S3 public URL 반환
-                try {
-                    if (fileService instanceof S3FileService) {
-                        String publicUrl = ((S3FileService) fileService).getS3PublicUrl(result.getFile().getFilename());
-                        fileData.put("url", publicUrl);
-                    } else {
-                        fileData.put("url", "/api/files/view/" + result.getFile().getFilename());
-                    }
-                } catch (Exception e) {
-                    log.warn("S3 URL 생성 실패, fallback URL 사용: {}", e.getMessage());
-                    fileData.put("url", "/api/files/view/" + result.getFile().getFilename());
-                }
-
+                fileData.put("url", "/api/files/view/" + result.getFile().getFilename());
                 response.put("file", fileData);
+                response.put("uploadUrl", result.getUploadUrl());
+                response.put("uploadHeaders", result.getUploadHeaders());
+                response.put("requiresUpload", result.isRequiresUpload());
 
                 return ResponseEntity.ok(response);
             } else {

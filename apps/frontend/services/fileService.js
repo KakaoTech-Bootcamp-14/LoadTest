@@ -81,9 +81,6 @@ class FileService {
     }
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
       const source = CancelToken.source();
       this.activeUploads.set(file.name, source);
 
@@ -91,31 +88,52 @@ class FileService {
         `${this.baseUrl}/api/files/upload` :
         '/api/files/upload';
 
-      // token과 sessionId는 axios 인터셉터에서 자동으로 추가되므로
-      // 여기서는 명시적으로 전달하지 않아도 됩니다
-      const response = await axiosInstance.post(uploadUrl, formData, {
+      const initPayload = {
+        filename: file.name,
+        mimetype: file.type || 'application/octet-stream',
+        size: file.size
+      };
+
+      const response = await axiosInstance.post(uploadUrl, initPayload, {
         headers: {
-          'Content-Type': 'multipart/form-data'
+          'Content-Type': 'application/json'
         },
         cancelToken: source.token,
-        withCredentials: true,
-        onUploadProgress: (progressEvent) => {
-          if (onProgress) {
+        withCredentials: true
+      });
+
+      if (!response.data || !response.data.success) {
+        this.activeUploads.delete(file.name);
+        return {
+          success: false,
+          message: response.data?.message || '파일 업로드에 실패했습니다.'
+        };
+      }
+
+      const { uploadUrl: presignedUrl, uploadHeaders, requiresUpload } = response.data;
+
+      if (requiresUpload && presignedUrl) {
+        const headers = {
+          ...(uploadHeaders || {}),
+          'Content-Type': file.type || 'application/octet-stream'
+        };
+
+        await axios.put(presignedUrl, file, {
+          headers,
+          cancelToken: source.token,
+          onUploadProgress: (progressEvent) => {
+            if (!onProgress || !progressEvent.total) return;
             const percentCompleted = Math.round(
               (progressEvent.loaded * 100) / progressEvent.total
             );
             onProgress(percentCompleted);
           }
-        }
-      });
+        });
+      }
 
       this.activeUploads.delete(file.name);
-
-      if (!response.data || !response.data.success) {
-        return {
-          success: false,
-          message: response.data?.message || '파일 업로드에 실패했습니다.'
-        };
+      if (onProgress) {
+        onProgress(100);
       }
 
       const fileData = response.data.file;
