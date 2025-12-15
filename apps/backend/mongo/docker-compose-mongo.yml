@@ -8,6 +8,8 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+    networks:
+      - mongo-network
 
   mongodb-exporter:
     image: percona/mongodb_exporter:0.47.1
@@ -18,8 +20,14 @@ services:
     ports:
       - "9216:9216"
     command:
-      - "--mongodb.uri=mongodb://127.0.0.1:27017/?directConnection=true"
+      - "--mongodb.uri=mongodb://mongo:27017/?directConnection=true"
       - "--collect-all"
+    networks:
+      - mongo-network
 
 volumes:
   mongo_data:
+
+networks:
+  mongo-network:
+    driver: bridge

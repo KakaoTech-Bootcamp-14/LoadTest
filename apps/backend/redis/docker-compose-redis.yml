@@ -18,7 +18,7 @@ services:
     restart: unless-stopped
     network_mode: "host"
     environment:
-      - REDIS_ADDR=redis://127.0.0.1:6379
+      - REDIS_ADDR=redis://:local@127.0.0.1:6379
     depends_on:
       - redis
 

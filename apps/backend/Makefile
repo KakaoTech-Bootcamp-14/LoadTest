@@ -5,6 +5,7 @@ SHELL := /bin/bash
 SSH_USER ?= ubuntu
 COMPOSE_O11Y_FILE ?= docker-compose.o11y.yaml
 BACKEND_SCALE ?= 3
+JAR_NAME ?= ktb-chat-backend-0.0.1-SNAPSHOT.jar
 
 # EC2 서버 목록 (IP 주소 또는 별칭)
 # 사용법: make deploy-jar SERVERS="server1 server2" 또는 make deploy-jar (전체)
@@ -123,13 +124,13 @@ build: verify-docker
 build-jar:
 	@echo "🔨 Building JAR file (skipping tests)..."
 	@$(SDKMAN_INIT) && ./mvnw clean package -DskipTests
-	@echo "✅ JAR file built: target/ktb-chat-backend-0.0.1-SNAPSHOT.jar"
+	@echo "✅ JAR file built: target/$(JAR_NAME)"
 
 # JAR 파일 빌드 (테스트 포함 - 프로덕션 배포용)
 build-jar-with-tests: verify-docker
 	@echo "🔨 Building JAR file with tests..."
 	@$(SDKMAN_INIT) && ./mvnw clean package
-	@echo "✅ JAR file built: target/ktb-chat-backend-0.0.1-SNAPSHOT.jar"
+	@echo "✅ JAR file built: target/$(JAR_NAME)"
 
 test: verify-docker
 	@echo "Running tests..."
@@ -210,8 +211,13 @@ deploy: verify-ssh-key
 	done
 	@echo "✅ All deployments completed!"
 
-# 전체 배포 (서버 중지 → JRE 설치 → JAR 빌드 → JAR 배포 → 서버 재시작)
-deploy-full: stop-servers install-jre-remote build-jar deploy-jar restart-servers
+# 전체 배포 (서버 중지 → JRE 설치 → 기존 JAR 정리 → JAR 빌드 → JAR 배포 → 서버 재시작)
+deploy-full: stop-servers install-jre-remote
+	@echo "🧹 Removing local JAR artifacts..."
+	@rm -f target/$(JAR_NAME)
+	@$(MAKE) build-jar
+	@$(MAKE) deploy-jar
+	@$(MAKE) restart-servers
 	@echo ""
 	@echo "✅ Full deployment completed!"
 	@echo ""
@@ -221,7 +227,7 @@ deploy-full: stop-servers install-jre-remote build-jar deploy-jar restart-server
 # JAR 파일 배포 (신규 방식 - JAR + 실행 스크립트만, 병렬 실행)
 deploy-jar: verify-ssh-key
 	@echo "📦 Deploying JAR to remote servers (parallel)..."
-	@if [ ! -f target/ktb-chat-backend-0.0.1-SNAPSHOT.jar ]; then \
+	@if [ ! -f target/$(JAR_NAME) ]; then \
 		echo "❌ JAR file not found!"; \
 		echo "   Run 'make build-jar' first"; \
 		exit 1; \
@@ -232,10 +238,12 @@ deploy-jar: verify-ssh-key
 	@pids=""; \
 	for server in $(SERVERS); do \
 		echo "  → Starting deployment to $$server..."; \
-		(ssh -i $(SSH_KEY) -o StrictHostKeyChecking=no $(SSH_USER)@$$server "mkdir -p $(DEPLOY_PATH)/{target,logs}" && \
+		(ssh -i $(SSH_KEY) -o StrictHostKeyChecking=no $(SSH_USER)@$$server "\
+			mkdir -p $(DEPLOY_PATH)/{target,logs} && \
+			rm -f $(DEPLOY_PATH)/target/$(JAR_NAME) $(DEPLOY_PATH)/logs/app.log" && \
 		 echo "    [$$server] Uploading JAR file..." && \
 		 rsync -az -e "ssh -i $(SSH_KEY) -o StrictHostKeyChecking=no" \
-			target/ktb-chat-backend-0.0.1-SNAPSHOT.jar \
+			target/$(JAR_NAME) \
 			$(SSH_USER)@$$server:$(DEPLOY_PATH)/target/ && \
 		 echo "    [$$server] Uploading control script..." && \
 		 rsync -az -e "ssh -i $(SSH_KEY) -o StrictHostKeyChecking=no" \
@@ -405,4 +413,3 @@ redis-restart: redis-down redis-up
 redis-cli:
 	@echo "🔧 Connecting to Redis CLI..."
 	@docker exec -it ktb-chat-redis redis-cli
-
