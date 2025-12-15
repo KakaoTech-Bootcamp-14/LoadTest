@@ -1,6 +1,5 @@
 package com.ktb.chatapp.service;
 
-import com.ktb.chatapp.dto.FileUploadInitRequest;
 import com.ktb.chatapp.dto.ProfileImageResponse;
 import com.ktb.chatapp.dto.UpdateProfileRequest;
 import com.ktb.chatapp.dto.UserResponse;
@@ -84,23 +83,6 @@ public class UserService {
     }
 
     /**
-     * 프로필 이미지 업로드 (presigned URL 기반)
-     */
-    public ProfileImageResponse uploadProfileImage(String email, FileUploadInitRequest request) {
-        User user = userRepository.findByEmail(email.toLowerCase())
-                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
-
-        validateProfileImageMetadata(request);
-
-        if (user.getProfileImage() != null && !user.getProfileImage().isEmpty()) {
-            deleteOldProfileImage(user.getProfileImage(), user.getId());
-        }
-
-        var uploadResult = fileService.initiateUpload(request, user.getId(), "profiles");
-        return applyProfileImageUpdate(user, uploadResult);
-    }
-
-    /**
      * 특정 사용자 프로필 조회
      */
     public UserResponse getUserProfile(String userId) {
@@ -142,36 +124,6 @@ public class UserService {
         }
     }
 
-    /**
-     * 프로필 이미지 메타데이터 유효성 검증 (presigned URL용)
-     */
-    private void validateProfileImageMetadata(FileUploadInitRequest request) {
-        if (request == null) {
-            throw new IllegalArgumentException("이미지 정보가 제공되지 않았습니다.");
-        }
-
-        if (request.getSize() == null || request.getSize() <= 0) {
-            throw new IllegalArgumentException("이미지 크기가 올바르지 않습니다.");
-        }
-
-        if (request.getSize() > maxProfileImageSize) {
-            throw new IllegalArgumentException("파일 크기는 5MB를 초과할 수 없습니다.");
-        }
-
-        if (!StringUtils.hasText(request.getMimetype()) || !request.getMimetype().startsWith("image/")) {
-            throw new IllegalArgumentException("이미지 파일만 업로드할 수 있습니다.");
-        }
-
-        if (!StringUtils.hasText(request.getFilename())) {
-            throw new IllegalArgumentException("이미지 파일만 업로드할 수 있습니다.");
-        }
-
-        String extension = FileUtil.getFileExtension(request.getFilename()).toLowerCase();
-        if (!ALLOWED_EXTENSIONS.contains(extension)) {
-            throw new IllegalArgumentException("이미지 파일만 업로드할 수 있습니다.");
-        }
-    }
-
     private ProfileImageResponse applyProfileImageUpdate(User user, FileUploadResult uploadResult) {
         if (uploadResult == null || uploadResult.getFile() == null) {
             throw new RuntimeException("업로드된 파일 정보를 찾을 수 없습니다.");
@@ -186,16 +138,11 @@ public class UserService {
 
         log.info("프로필 이미지 업로드 완료 - User ID: {}, File: {}", user.getId(), profileImageUrl);
 
-        return ProfileImageResponse.builder()
-                .success(true)
-                .message("프로필 이미지가 업데이트되었습니다.")
-                .imageUrl(profileImageUrl)
-                .uploadUrl(uploadResult.getUploadUrl())
-                .uploadHeaders(uploadResult.getUploadHeaders())
-                .requiresUpload(uploadResult.isRequiresUpload())
-                .filename(safeFilename)
-                .fileId(uploadResult.getFile().getId())
-                .build();
+        return new ProfileImageResponse(
+                true,
+                "프로필 이미지가 업데이트되었습니다.",
+                profileImageUrl
+        );
     }
 
     /**

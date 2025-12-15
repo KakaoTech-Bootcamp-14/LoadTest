@@ -88,18 +88,23 @@ class FileService {
         `${this.baseUrl}/api/files/upload` :
         '/api/files/upload';
 
-      const initPayload = {
-        filename: file.name,
-        mimetype: file.type || 'application/octet-stream',
-        size: file.size
-      };
+      const formData = new FormData();
+      formData.append('file', file);
 
-      const response = await axiosInstance.post(uploadUrl, initPayload, {
+      const response = await axiosInstance.post(uploadUrl, formData, {
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'multipart/form-data'
         },
         cancelToken: source.token,
-        withCredentials: true
+        withCredentials: true,
+        onUploadProgress: (progressEvent) => {
+          if (onProgress && progressEvent.total) {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            onProgress(percentCompleted);
+          }
+        }
       });
 
       if (!response.data || !response.data.success) {
@@ -108,27 +113,6 @@ class FileService {
           success: false,
           message: response.data?.message || '파일 업로드에 실패했습니다.'
         };
-      }
-
-      const { uploadUrl: presignedUrl, uploadHeaders, requiresUpload } = response.data;
-
-      if (requiresUpload && presignedUrl) {
-        const headers = {
-          ...(uploadHeaders || {}),
-          'Content-Type': file.type || 'application/octet-stream'
-        };
-
-        await axios.put(presignedUrl, file, {
-          headers,
-          cancelToken: source.token,
-          onUploadProgress: (progressEvent) => {
-            if (!onProgress || !progressEvent.total) return;
-            const percentCompleted = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-            onProgress(percentCompleted);
-          }
-        });
       }
 
       this.activeUploads.delete(file.name);

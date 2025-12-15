@@ -1,6 +1,5 @@
 package com.ktb.chatapp.controller;
 
-import com.ktb.chatapp.dto.FileUploadInitRequest;
 import com.ktb.chatapp.dto.StandardResponse;
 import com.ktb.chatapp.model.File;
 import com.ktb.chatapp.model.User;
@@ -16,7 +15,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import java.net.URI;
 import java.security.Principal;
 import java.util.HashMap;
@@ -33,11 +31,9 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -67,31 +63,15 @@ public class FileController {
         @ApiResponse(responseCode = "500", description = "서버 내부 오류",
             content = @Content(schema = @Schema(implementation = StandardResponse.class)))
     })
-    @PostMapping(
-            value = "/upload",
-            consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE})
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadFile(
-            @Parameter(description = "업로드할 파일") @RequestPart(value = "file", required = false) MultipartFile file,
-            @Parameter(description = "업로드할 파일 메타데이터") @RequestPart(value = "metadata", required = false) @Valid FileUploadInitRequest metadata,
-            @RequestBody(required = false) @Valid FileUploadInitRequest jsonRequest,
+            @Parameter(description = "업로드할 파일") @RequestParam("file") MultipartFile file,
             Principal principal) {
         try {
             User user = userRepository.findByEmail(principal.getName())
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + principal.getName()));
 
-            FileUploadInitRequest request = metadata != null ? metadata : jsonRequest;
-            FileUploadResult result;
-
-            if (file != null && !file.isEmpty()) {
-                result = fileService.uploadFile(file, user.getId());
-            } else if (request != null) {
-                result = fileService.initiateUpload(request, user.getId());
-            } else {
-                Map<String, Object> errorResponse = new HashMap<>();
-                errorResponse.put("success", false);
-                errorResponse.put("message", "업로드할 파일 정보가 없습니다.");
-                return ResponseEntity.badRequest().body(errorResponse);
-            }
+            FileUploadResult result = fileService.uploadFile(file, user.getId());
 
             if (result.isSuccess()) {
                 Map<String, Object> response = new HashMap<>();
@@ -107,9 +87,6 @@ public class FileController {
                 fileData.put("uploadDate", result.getFile().getUploadDate());
                 fileData.put("url", "/api/files/view/" + result.getFile().getFilename());
                 response.put("file", fileData);
-                response.put("uploadUrl", result.getUploadUrl());
-                response.put("uploadHeaders", result.getUploadHeaders());
-                response.put("requiresUpload", result.isRequiresUpload());
 
                 return ResponseEntity.ok(response);
             } else {

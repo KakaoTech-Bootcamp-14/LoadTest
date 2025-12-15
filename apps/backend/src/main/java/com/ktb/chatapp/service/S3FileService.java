@@ -1,7 +1,6 @@
 package com.ktb.chatapp.service;
 
 import com.ktb.chatapp.config.properties.S3Properties;
-import com.ktb.chatapp.dto.FileUploadInitRequest;
 import com.ktb.chatapp.model.File;
 import com.ktb.chatapp.model.Message;
 import com.ktb.chatapp.model.Room;
@@ -17,10 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
@@ -28,13 +24,13 @@ import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
-import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 @Slf4j
 @Service
@@ -76,18 +72,6 @@ public class S3FileService implements FileService {
 
     @Override
     public FileUploadResult uploadFile(MultipartFile file, String uploaderId, String subDirectory) {
-        if (useS3) {
-            FileUploadInitRequest request = new FileUploadInitRequest();
-            request.setFilename(Optional.ofNullable(file.getOriginalFilename())
-                    .map(StringUtils::cleanPath)
-                    .orElse("file"));
-            request.setMimetype(StringUtils.hasText(file.getContentType())
-                    ? file.getContentType()
-                    : "application/octet-stream");
-            request.setSize(file.getSize());
-            return initiateUpload(request, uploaderId, subDirectory);
-        }
-
         try {
             FileUtil.validateFile(file);
 
@@ -144,74 +128,6 @@ public class S3FileService implements FileService {
     @Override
     public FileUploadResult uploadFile(MultipartFile file, String uploaderId) {
         return uploadFile(file, uploaderId, properties.getDefaultFolder());
-    }
-
-    @Override
-    public FileUploadResult initiateUpload(FileUploadInitRequest request, String uploaderId) {
-        return initiateUpload(request, uploaderId, properties.getDefaultFolder());
-    }
-
-    @Override
-    public FileUploadResult initiateUpload(FileUploadInitRequest request, String uploaderId, String subDirectory) {
-        try {
-            if (request == null) {
-                throw new RuntimeException("업로드 정보가 제공되지 않았습니다.");
-            }
-
-            long fileSize = Optional.ofNullable(request.getSize()).orElse(0L);
-            FileUtil.validateFileMetadata(request.getFilename(), request.getMimetype(), fileSize);
-
-            String originalFilename = Optional.ofNullable(request.getFilename())
-                    .map(StringUtils::cleanPath)
-                    .orElse("file");
-            String mimeType = StringUtils.hasText(request.getMimetype())
-                    ? request.getMimetype()
-                    : "application/octet-stream";
-
-            if (!useS3) {
-                throw new RuntimeException("S3가 구성되지 않았습니다. 로컬 업로드를 사용하려면 파일 데이터를 전송하세요.");
-            }
-
-            String safeFileName = FileUtil.generateSafeFileName(originalFilename);
-            String objectKey = buildObjectKey(subDirectory, safeFileName);
-
-            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                    .bucket(properties.getBucket())
-                    .key(objectKey)
-                    .contentType(mimeType)
-                    .contentLength(fileSize)
-                    .build();
-
-            var presignRequest = PutObjectPresignRequest.builder()
-                    .signatureDuration(properties.getPresignDuration())
-                    .putObjectRequest(putObjectRequest)
-                    .build();
-
-            var presigned = s3Presigner.presignPutObject(presignRequest);
-
-            File fileEntity = File.builder()
-                    .filename(safeFileName)
-                    .originalname(FileUtil.normalizeOriginalFilename(originalFilename))
-                    .mimetype(mimeType)
-                    .size(fileSize)
-                    .path(objectKey)
-                    .user(uploaderId)
-                    .uploadDate(LocalDateTime.now())
-                    .build();
-
-            File savedFile = fileRepository.save(fileEntity);
-
-            return FileUploadResult.builder()
-                    .success(true)
-                    .file(savedFile)
-                    .uploadUrl(presigned.url().toString())
-                    .uploadHeaders(flattenHeaders(presigned.signedHeaders()))
-                    .requiresUpload(true)
-                    .build();
-        } catch (Exception e) {
-            log.error("파일 업로드 초기화 실패: {}", e.getMessage(), e);
-            throw new RuntimeException("파일 업로드에 실패했습니다: " + e.getMessage(), e);
-        }
     }
 
     @Override
@@ -342,18 +258,6 @@ public class S3FileService implements FileService {
         } catch (MalformedURLException e) {
             throw new RuntimeException("파일을 찾을 수 없습니다.", e);
         }
-    }
-
-    private Map<String, String> flattenHeaders(Map<String, List<String>> headers) {
-        if (headers == null) {
-            return Map.of();
-        }
-
-        return headers.entrySet().stream()
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        entry -> String.join(",", entry.getValue())
-                ));
     }
 
     private String buildObjectKey(String subDirectory, String safeFileName) {

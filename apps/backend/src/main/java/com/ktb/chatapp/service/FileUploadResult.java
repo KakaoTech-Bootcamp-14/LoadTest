@@ -1,7 +1,6 @@
 package com.ktb.chatapp.service;
 
 import com.ktb.chatapp.model.File;
-import java.util.Map;
 import lombok.Builder;
 import lombok.Data;
 
@@ -13,8 +12,4 @@ import lombok.Data;
 public class FileUploadResult {
     private boolean success;
     private File file;
-    private String uploadUrl;
-    private Map<String, String> uploadHeaders;
-    @Builder.Default
-    private boolean requiresUpload = false;
 }

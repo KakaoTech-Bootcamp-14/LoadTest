@@ -1,4 +1,3 @@
-import axios from 'axios';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { CameraIcon, CloseOutlineIcon } from '@vapor-ui/icons';
 import { Button, Text, Callout, IconButton, VStack, HStack } from '@vapor-ui/core';
@@ -72,36 +71,24 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
         throw new Error('인증 정보가 없습니다.');
       }
 
-      const uploadInitPayload = {
-        filename: file.name,
-        mimetype: file.type || 'application/octet-stream',
-        size: file.size
-      };
+      const formData = new FormData();
+      formData.append('profileImage', file);
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/profile-image`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'x-auth-token': user?.token,
           'x-session-id': user?.sessionId
         },
-        body: JSON.stringify(uploadInitPayload)
+        body: formData
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || '이미지 업로드에 실패했습니다.');
+      }
+
       const data = await response.json();
-
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.message || '이미지 업로드에 실패했습니다.');
-      }
-
-      if (data.requiresUpload && data.uploadUrl) {
-        const headers = {
-          ...(data.uploadHeaders || {}),
-          'Content-Type': file.type || 'application/octet-stream'
-        };
-
-        await axios.put(data.uploadUrl, file, { headers });
-      }
 
       const nextImageUrl = data.imageUrl;
       if (previewUrl && previewUrl.startsWith('blob:')) {

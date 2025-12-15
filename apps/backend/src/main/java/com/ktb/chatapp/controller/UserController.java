@@ -1,6 +1,5 @@
 package com.ktb.chatapp.controller;
 
-import com.ktb.chatapp.dto.FileUploadInitRequest;
 import com.ktb.chatapp.dto.StandardResponse;
 import com.ktb.chatapp.dto.ProfileImageResponse;
 import com.ktb.chatapp.dto.UpdateProfileRequest;
@@ -16,7 +15,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -25,7 +23,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -122,25 +120,16 @@ public class UserController {
         @ApiResponse(responseCode = "500", description = "서버 내부 오류",
             content = @Content(schema = @Schema(implementation = StandardResponse.class)))
     })
-    @PostMapping(value = "/profile-image", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE})
+    @PostMapping("/profile-image")
     public ResponseEntity<?> uploadProfileImage(
             Principal principal,
-            @RequestPart(value = "profileImage", required = false) MultipartFile file,
-            @RequestPart(value = "metadata", required = false) @Valid FileUploadInitRequest metadata,
-            @RequestBody(required = false) @Valid FileUploadInitRequest jsonRequest) {
+            @RequestParam("profileImage") MultipartFile file) {
 
         try {
-            FileUploadInitRequest request = metadata != null ? metadata : jsonRequest;
-            ProfileImageResponse response;
-
-            if (file != null && !file.isEmpty()) {
-                response = userService.uploadProfileImage(principal.getName(), file);
-            } else if (request != null) {
-                response = userService.uploadProfileImage(principal.getName(), request);
-            } else {
+            if (file == null || file.isEmpty()) {
                 return ResponseEntity.badRequest().body(StandardResponse.error("업로드할 이미지 정보가 없습니다."));
             }
-
+            ProfileImageResponse response = userService.uploadProfileImage(principal.getName(), file);
             return ResponseEntity.ok(response);
         } catch (UsernameNotFoundException e) {
             log.error("프로필 이미지 업로드 실패 - 사용자 없음: {}", e.getMessage());
