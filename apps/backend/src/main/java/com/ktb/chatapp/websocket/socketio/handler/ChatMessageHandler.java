@@ -19,6 +19,7 @@ import com.ktb.chatapp.service.SessionService;
 import com.ktb.chatapp.service.SessionValidationResult;
 import com.ktb.chatapp.service.RateLimitService;
 import com.ktb.chatapp.service.RateLimitCheckResult;
+import com.ktb.chatapp.service.S3FileService;
 import com.ktb.chatapp.websocket.socketio.SocketUser;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -47,6 +48,7 @@ public class ChatMessageHandler {
     private final SessionService sessionService;
     private final BannedWordChecker bannedWordChecker;
     private final RateLimitService rateLimitService;
+    private final S3FileService s3FileService;
     private final MeterRegistry meterRegistry;
     
     @OnEvent(CHAT_MESSAGE)
@@ -247,7 +249,15 @@ public class ChatMessageHandler {
 
         if (message.getFileId() != null) {
             fileRepository.findById(message.getFileId())
-                    .ifPresent(file -> messageResponse.setFile(FileResponse.from(file)));
+                    .ifPresent(file -> {
+                        try {
+                            String s3Url = s3FileService.getS3PublicUrl(file.getFilename());
+                            messageResponse.setFile(FileResponse.from(file, s3Url));
+                        } catch (Exception e) {
+                            log.warn("S3 URL 생성 실패, fallback URL 사용: {}", e.getMessage());
+                            messageResponse.setFile(FileResponse.from(file));
+                        }
+                    });
         }
 
         return messageResponse;

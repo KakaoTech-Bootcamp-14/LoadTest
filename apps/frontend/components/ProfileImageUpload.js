@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { CameraIcon, CloseOutlineIcon } from '@vapor-ui/icons';
 import { Button, Text, Callout, IconButton, VStack, HStack } from '@vapor-ui/core';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,21 +12,37 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
+  // 파일 뷰 엔드포인트에 인증 쿼리를 붙여 이미지 요청이 차단되지 않도록 처리
+  const appendAuthParams = useCallback((url) => {
+    if (!url || !user?.token) return url;
+    if (!url.includes('/api/files/')) return url;
+    if (url.includes('token=')) return url;
+
+    const params = new URLSearchParams();
+    params.set('token', user.token);
+    if (user?.sessionId) {
+      params.set('sessionId', user.sessionId);
+    }
+
+    const delimiter = url.includes('?') ? '&' : '?';
+    return `${url}${delimiter}${params.toString()}`;
+  }, [user?.token, user?.sessionId]);
+
   // 프로필 이미지 URL 생성
-  const getProfileImageUrl = (imagePath) => {
+  const getProfileImageUrl = useCallback((imagePath) => {
     if (!imagePath) return null;
     const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
-    if (imagePath.startsWith('http')) return imagePath;
-    if (imagePath.startsWith('/')) return `${apiBase}${imagePath}`;
+    if (imagePath.startsWith('http')) return appendAuthParams(imagePath);
+    if (imagePath.startsWith('/')) return appendAuthParams(`${apiBase}${imagePath}`);
     const encoded = encodeURIComponent(imagePath);
-    return `${apiBase}/api/files/view/${encoded}`;
-  };
+    return appendAuthParams(`${apiBase}/api/files/view/${encoded}`);
+  }, [appendAuthParams]);
 
   // 컴포넌트 마운트 시 이미지 설정
   useEffect(() => {
     const imageUrl = getProfileImageUrl(currentImage);
     setPreviewUrl(imageUrl);
-  }, [currentImage]);
+  }, [currentImage, getProfileImageUrl]);
 
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];

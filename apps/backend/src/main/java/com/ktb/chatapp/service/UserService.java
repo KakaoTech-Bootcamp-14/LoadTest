@@ -81,7 +81,19 @@ public class UserService {
         // 새 파일 저장 (보안 검증 포함)
         var uploadResult = fileService.uploadFile(file, user.getId(), "profiles");
         String safeFilename = uploadResult.getFile().getFilename();
-        String profileImageUrl = "/api/files/view/" + safeFilename;
+
+        // S3 public URL 생성
+        String profileImageUrl;
+        try {
+            if (fileService instanceof S3FileService) {
+                profileImageUrl = ((S3FileService) fileService).getS3PublicUrl(safeFilename);
+            } else {
+                profileImageUrl = "/api/files/view/" + safeFilename;
+            }
+        } catch (Exception e) {
+            log.warn("S3 URL 생성 실패, fallback URL 사용: {}", e.getMessage());
+            profileImageUrl = "/api/files/view/" + safeFilename;
+        }
 
         // 사용자 프로필 이미지 URL 업데이트
         user.setProfileImage(profileImageUrl);

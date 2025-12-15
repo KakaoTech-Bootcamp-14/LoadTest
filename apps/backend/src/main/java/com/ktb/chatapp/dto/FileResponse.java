@@ -37,4 +37,18 @@ public class FileResponse {
                 .url("/api/files/view/" + file.getFilename())
                 .build();
     }
+
+    // URL을 직접 지정하는 변환 메서드
+    public static FileResponse from(File file, String url) {
+        return FileResponse.builder()
+                .id(file.getId())
+                .filename(file.getFilename())
+                .originalname(file.getOriginalname())
+                .mimetype(file.getMimetype())
+                .size(file.getSize())
+                .user(file.getUser())
+                .uploadDate(file.getUploadDate())
+                .url(url)
+                .build();
+    }
 }

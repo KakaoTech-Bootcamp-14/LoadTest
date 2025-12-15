@@ -319,4 +319,32 @@ public class S3FileService implements FileService {
             log.warn("로컬 파일 삭제 실패: {}", e.getMessage());
         }
     }
+
+    /**
+     * S3 public URL 생성
+     */
+    public String getS3PublicUrl(String filename) {
+        File fileEntity = fileRepository.findByFilename(filename)
+                .orElseThrow(() -> new RuntimeException("파일을 찾을 수 없습니다: " + filename));
+
+        if (!useS3) {
+            // 로컬 모드일 경우 기존 방식 사용
+            return "/api/files/view/" + filename;
+        }
+
+        // S3 public URL 생성
+        String objectKey = fileEntity.getPath();
+        String endpointUrl = properties.getEndpointOverride();
+
+        if (StringUtils.hasText(endpointUrl)) {
+            // Custom endpoint (LocalStack/MinIO)
+            return String.format("%s/%s/%s", endpointUrl, properties.getBucket(), objectKey);
+        } else {
+            // AWS S3 standard URL
+            return String.format("https://%s.s3.%s.amazonaws.com/%s",
+                    properties.getBucket(),
+                    properties.getRegion(),
+                    objectKey);
+        }
+    }
 }

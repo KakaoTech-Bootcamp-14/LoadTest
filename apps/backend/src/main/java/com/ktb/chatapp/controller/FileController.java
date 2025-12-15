@@ -8,6 +8,7 @@ import com.ktb.chatapp.repository.UserRepository;
 import com.ktb.chatapp.service.FileService;
 import com.ktb.chatapp.service.FileUploadResult;
 import com.ktb.chatapp.service.PresignedUrlResult;
+import com.ktb.chatapp.service.S3FileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -76,7 +77,7 @@ public class FileController {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
                 response.put("message", "파일 업로드 성공");
-                
+
                 Map<String, Object> fileData = new HashMap<>();
                 fileData.put("_id", result.getFile().getId());
                 fileData.put("filename", result.getFile().getFilename());
@@ -84,8 +85,20 @@ public class FileController {
                 fileData.put("mimetype", result.getFile().getMimetype());
                 fileData.put("size", result.getFile().getSize());
                 fileData.put("uploadDate", result.getFile().getUploadDate());
-                fileData.put("url", "/api/files/view/" + result.getFile().getFilename());
-                
+
+                // S3 public URL 반환
+                try {
+                    if (fileService instanceof S3FileService) {
+                        String publicUrl = ((S3FileService) fileService).getS3PublicUrl(result.getFile().getFilename());
+                        fileData.put("url", publicUrl);
+                    } else {
+                        fileData.put("url", "/api/files/view/" + result.getFile().getFilename());
+                    }
+                } catch (Exception e) {
+                    log.warn("S3 URL 생성 실패, fallback URL 사용: {}", e.getMessage());
+                    fileData.put("url", "/api/files/view/" + result.getFile().getFilename());
+                }
+
                 response.put("file", fileData);
 
                 return ResponseEntity.ok(response);

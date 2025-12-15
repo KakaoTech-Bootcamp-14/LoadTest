@@ -30,7 +30,8 @@ const FileMessage = ({
   const messageDomRef = useRef(null);
   useEffect(() => {
     if (msg?.file) {
-      const url = fileService.getPreviewUrl(msg.file, user?.token, user?.sessionId, true);
+      // 백엔드에서 받은 S3 URL이 있으면 그것을 사용, 없으면 기존 방식 사용
+      const url = msg.file.url || fileService.getPreviewUrl(msg.file, user?.token, user?.sessionId, true);
       setPreviewUrl(url);
       console.debug('Preview URL generated:', {
         filename: msg.file.filename,
@@ -170,7 +171,8 @@ const FileMessage = ({
         throw new Error('인증 정보가 없습니다.');
       }
 
-      const previewUrl = fileService.getPreviewUrl(msg.file, user?.token, user?.sessionId, true);
+      // 백엔드에서 받은 S3 URL이 있으면 그것을 사용, 없으면 기존 방식 사용
+      const previewUrl = msg.file.url || fileService.getPreviewUrl(msg.file, user?.token, user?.sessionId, true);
 
       return (
         <div className="bg-transparent-pattern">

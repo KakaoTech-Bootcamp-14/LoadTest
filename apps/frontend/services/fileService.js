@@ -125,7 +125,8 @@ class FileService {
           ...response.data,
           file: {
             ...fileData,
-            url: this.getFileUrl(fileData.filename, true)
+            // 백엔드에서 받은 URL(S3 public URL)을 그대로 사용
+            url: fileData.url || this.getFileUrl(fileData.filename, true)
           }
         }
       };

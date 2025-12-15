@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, forwardRef } from 'react';
 import { Avatar } from '@vapor-ui/core';
 import { generateColorFromEmail, getContrastTextColor } from '@/utils/colorUtils';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * CustomAvatar 컴포넌트
@@ -28,6 +29,7 @@ const CustomAvatar = forwardRef(({
   style = {},
   ...props
 }, ref) => {
+  const { user: authUser } = useAuth();
   // persistent 모드일 때만 상태 관리
   const [currentImage, setCurrentImage] = useState('');
   const [imageError, setImageError] = useState(false);
@@ -35,6 +37,25 @@ const CustomAvatar = forwardRef(({
   // 이메일 기반 배경색/텍스트 색상 생성
   const backgroundColor = generateColorFromEmail(user?.email);
   const color = getContrastTextColor(backgroundColor);
+
+  // 파일 뷰 엔드포인트에 인증 쿼리 파라미터를 붙여서 이미지가 차단되지 않도록 처리
+  const appendAuthParams = useCallback((url) => {
+    const token = user?.token || authUser?.token;
+    const sessionId = user?.sessionId || authUser?.sessionId;
+
+    if (!url || !token) return url;
+    if (!url.includes('/api/files/')) return url;
+    if (url.includes('token=')) return url;
+
+    const params = new URLSearchParams();
+    params.set('token', token);
+    if (sessionId) {
+      params.set('sessionId', sessionId);
+    }
+
+    const delimiter = url.includes('?') ? '&' : '?';
+    return `${url}${delimiter}${params.toString()}`;
+  }, [user?.token, user?.sessionId, authUser?.token, authUser?.sessionId]);
 
   // 프로필 이미지 URL 생성 (memoized)
   const getImageUrl = useCallback((imagePath) => {
@@ -45,15 +66,15 @@ const CustomAvatar = forwardRef(({
     
     // 이미 전체 URL인 경우
     if (imagePath.startsWith('http')) {
-      return imagePath;
+      return appendAuthParams(imagePath);
     }
     // API URL과 결합 필요한 경우
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
     if (imagePath.startsWith('/')) {
-      return `${baseUrl}${imagePath}`;
+      return appendAuthParams(`${baseUrl}${imagePath}`);
     }
-    return `${baseUrl}/api/files/view/${encodeURIComponent(imagePath)}`;
-  }, [src]);
+    return appendAuthParams(`${baseUrl}/api/files/view/${encodeURIComponent(imagePath)}`);
+  }, [src, appendAuthParams]);
 
   // persistent 모드: 프로필 이미지 URL 처리
   useEffect(() => {
